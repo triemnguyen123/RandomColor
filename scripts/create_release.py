@@ -75,6 +75,7 @@ def main():
     # Update version in files
     update_version(version)
     
+    # Create release
     create_release(version)
     
     print("Release created successfully!")

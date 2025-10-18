@@ -50,6 +50,7 @@ def create_release(version):
     
     print(f"Created release {tag}")
     print("GitHub Actions will automatically build and publish the release")
+    
 
 def main():
     if len(sys.argv) != 2:

@@ -14,7 +14,7 @@ class AddonUpdater:
     
     def __init__(self):
         self.github_repo = "triemnguyen123/RandomColor"
-        self.current_version = (1, 0, 1)  # Will be updated from bl_info
+        self.current_version = (1, 0, 2)  # Will be updated from bl_info
         self.addon_name = "Random Color"
         
     def get_latest_version(self):
@@ -112,20 +112,23 @@ class OBJECT_OT_auto_reload_addon(bpy.types.Operator):
     bl_options = {"INTERNAL"}
     
     def execute(self, context):
-        # Unregister và register lại add-on
-        from .. import classes
-        for cls in classes:
-            bpy.utils.unregister_class(cls)
+        try:
+            # Simple addon reload using Blender's built-in method
+            import addon_utils
+            addon_name = "random_color_addon"
+            
+            # Check if addon is enabled
+            if addon_utils.check(addon_name)[1]:
+                # Disable addon
+                addon_utils.disable(addon_name)
+                
+                # Enable addon again
+                addon_utils.enable(addon_name)
+                
+                self.report({'INFO'}, "Add-on reloaded!")
+            else:
+                self.report({'WARNING'}, "Add-on is not currently enabled")
+        except Exception as e:
+            self.report({'ERROR'}, f"Reload failed: {str(e)}")
         
-        # Import lại module
-        import importlib
-        import sys
-        current_module = sys.modules[__package__]
-        importlib.reload(current_module)
-        
-        # Register lại
-        for cls in classes:
-            bpy.utils.register_class(cls)
-        
-        self.report({'INFO'}, "Add-on reloaded!")
         return {'FINISHED'}

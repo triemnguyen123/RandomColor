@@ -4,6 +4,7 @@ Core operators for Random Color add-on
 import bpy
 import bmesh
 import random
+import traceback
 from mathutils import Vector
 
 
@@ -37,7 +38,8 @@ class MESH_OT_random_color_selected_faces(bpy.types.Operator):
             return {'CANCELLED'}
         
         # Get bmesh
-        bm = bmesh.from_mesh(obj.data)
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
         bm.faces.ensure_lookup_table()
         
         # Get selected faces
@@ -83,7 +85,8 @@ class MESH_OT_clear_random_color_selected_faces(bpy.types.Operator):
             return {'CANCELLED'}
         
         # Get bmesh
-        bm = bmesh.from_mesh(obj.data)
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
         bm.faces.ensure_lookup_table()
         
         # Get selected faces
@@ -116,15 +119,62 @@ class OBJECT_OT_faceset_sculpt(bpy.types.Operator):
             self.report({'ERROR'}, "No active mesh object")
             return {'CANCELLED'}
         
-        # Switch to Sculpt mode
+        # Store original mode
         original_mode = obj.mode
-        bpy.ops.object.mode_set(mode='SCULPT')
         
-        # Create FaceSet from selected faces
-        bpy.ops.paint.face_set_create()
-        
-        # Return to original mode
-        bpy.ops.object.mode_set(mode=original_mode)
-        
-        self.report({'INFO'}, "FaceSet created successfully")
-        return {'FINISHED'}
+        try:
+            # Step 1: Switch to Edit mode
+            if original_mode != 'EDIT':
+                bpy.ops.object.mode_set(mode='EDIT')
+            
+            # Step 2: Get selected faces
+            bm = bmesh.from_edit_mesh(obj.data)
+            bm.faces.ensure_lookup_table()
+            selected_face_indices = [f.index for f in bm.faces if f.select]
+            
+            if not selected_face_indices:
+                self.report({'ERROR'}, "No faces selected")
+                return {'CANCELLED'}
+            
+            # Step 3: Switch to Object mode to access mesh data
+            bpy.ops.object.mode_set(mode='OBJECT')
+            
+            # Step 4: Get or create face set attribute
+            mesh = obj.data
+            if ".sculpt_face_set" not in mesh.attributes:
+                face_set_attr = mesh.attributes.new(name=".sculpt_face_set", type='INT', domain='FACE')
+            else:
+                face_set_attr = mesh.attributes[".sculpt_face_set"]
+            
+            # Step 5: Find the maximum face set ID
+            max_id = 0
+            for poly in mesh.polygons:
+                face_set_id = face_set_attr.data[poly.index].value
+                if face_set_id > max_id:
+                    max_id = face_set_id
+            
+            # Step 6: Assign new face set ID to selected faces
+            new_face_set_id = max_id + 1
+            for face_idx in selected_face_indices:
+                face_set_attr.data[face_idx].value = new_face_set_id
+            
+            # Step 7: Return to Edit mode
+            bpy.ops.object.mode_set(mode='EDIT')
+            
+            # Step 8: Unhide all faces (Alt+H equivalent)
+            bpy.ops.mesh.reveal()
+            
+            self.report({'INFO'}, f"FaceSet created successfully from {len(selected_face_indices)} selected faces. All faces unhidden. Switch to Sculpt mode to see FaceSet.")
+            return {'FINISHED'}
+            
+        except Exception as e:
+            # Restore original mode on error
+            try:
+                bpy.ops.object.mode_set(mode=original_mode)
+            except:
+                pass
+            self.report({'ERROR'}, f"FaceSet creation failed: {str(e)}")
+            return {'CANCELLED'}
+
+
+# Removed OBJECT_OT_block_unused_materials - not needed
